@@ -8,27 +8,65 @@ import PySimpleGUI as sg
 #         weight integer
 #     )""")
 
+exerciseAdded = False
+actionsDone = 0
+
 def submit(values):
+    global exerciseAdded
+    global names
+    global actionsDone
     # connect to database
     conncet = sqlite3.connect('tracker.db')
 
     # create cursork
     c = conncet.cursor()
 
-    c.execute(f"SELECT * FROM exercises WHERE exercise = ?", (values['inp'],))    
+    c.execute(f"SELECT id, exercise FROM exercises WHERE exercise = ?", (values['inp'],))    
     data = c.fetchone()
-    if data > 0:
-        pass
+    if values['weightinp'] == '' or values['inp'] == '':
+        sg.popup_ok("You must fill in all fields before submitting", title="Error")
+        return
+    c.execute("SELECT MAX(rowid) FROM data")
+    maxrow = c.fetchone()
+    if data != None:
+        c.execute("INSERT INTO data VALUES (:id, :weight, :exercise_id)",
+                {
+                    'id': maxrow[0] + 1,
+                    'weight': values['weightinp'],#drop down menu,
+                    'exercise_id': data[0]
+                }
+                )
+        conncet.commit() 
+        exerciseAdded = False
+        actionsDone += 1    
     else:
     #insert into table
-        c.execute("INSERT INTO exercises VALUES (:exercise, :weight)",
+        c.execute("SELECT MAX(rowid) FROM exercises")
+        maxrow = c.fetchone()
+        c.execute("INSERT INTO exercises VALUES (:id, :exercise)",
                 {
+                    'id': maxrow[0] + 1,
                     'exercise': values['inp'],#drop down menu,
-                    'weight': values['weightinp']#input field 
                 }
                 )
         conncet.commit()
-
+        exerciseAdded = True
+        actionsDone += 1
+        names.append(values['inp'])
+        window['inp'].update(values=names)
+        print(names)
+        c.execute("SELECT MAX(rowid) FROM data")
+        maxrow = c.fetchone()
+        c.execute(f"SELECT rowid, exercise FROM exercises WHERE exercise = ?", (values['inp'],))    
+        data = c.fetchone()
+        c.execute("INSERT INTO data VALUES (:id, :weight, :exercise_id)",
+                {
+                    'id': maxrow[0] + 1,
+                    'weight': values['weightinp'],#drop down menu,
+                    'exercise_id': data[0]
+                }
+                )
+        conncet.commit()   
 
     # close connection
     conncet.close()
@@ -42,17 +80,42 @@ def callData(values):
     # create cursork
     c = conncet.cursor()
     
-    c.execute(f"SELECT *, oid FROM exercises WHERE exercise = ?", (values['inp'],))    
+    c.execute(f"SELECT *, rowid FROM exercises WHERE exercise = ?", (values['inp'],))    
     data = c.fetchall()
     print(data)
 
 
-
-
+def undo():
+    global exerciseAdded, actionsDone
+    if actionsDone == 0:
+        sg.popup_ok("No action to undo!", title="Error")
+        return
+    conncet = sqlite3.connect('tracker.db')
+    c = conncet.cursor()
+    if exerciseAdded == True:
+        print('running')
+        c.execute("DELETE FROM exercises WHERE rowid = (SELECT MAX(rowid) FROM exercises)")
+        c.execute("DELETE FROM data WHERE rowid = (SELECT MAX(rowid) FROM exercises)")
+    else:
+        print('also running')
+        c.execute("DELETE FROM data WHERE rowid = (SELECT MAX(rowid) FROM exercises)")
+    exerciseAdded = False
+    actionsDone -= 1
+    #searches data table for most recent item and finds the 
+    #if the new exercise added is true then remove that
+#TODO add an undo button, review data section
 
 sg.theme('DarkAmber')
 
-names = ['test1', 'test2', 'test3', 'test4', 'test5']
+conncet = sqlite3.connect('tracker.db')
+c = conncet.cursor()
+c.execute(f"SELECT * FROM exercises")    
+data = c.fetchall()
+print(data)
+names = []
+for exercise in data:
+    names.append(exercise[0])
+print(names)
 
 l2=sg.Text("test on page 2")
 tab1= [     [sg.Text('Exercise'), sg.Combo(names, key="inp", enable_events=True, default_value='')],
@@ -64,7 +127,7 @@ layout = [
             [sg.Tab('Data Entry', tab1),
             sg.Tab('Review Data', tab2)]])],
             #[psg.OK(), psg.Cancel()]
-            [sg.Button('Submit'), sg.Button('Clear')] ]
+            [sg.Button('Submit'), sg.Button('Clear'), sg.Button('Undo')] ]
 
 # tab2=sg.Tab("title2", l2)
 # Tg = sg.TabGroup([[tab1, tab2]])
@@ -83,6 +146,9 @@ while True:
     elif event == "Clear":
         print("clearing page")
         window['inp'].update('')
+    elif event == "Undo":
+        print("undoing last action")
+        undo()
     elif event == 'Test':
         callData(values)
 window.close()
