@@ -8,8 +8,8 @@ c.execute("""CREATE TABLE exercises (
     )""")
 
 c.execute("""CREATE TABLE data (
-          id integer primary key,
-          weight integer not null,
-          exercise_id integer not null,
-          foreign key (exercise_id) references exercises(id)
+        id integer primary key,
+        weight integer not null,
+        exercise_id integer not null,
+        foreign key (exercise_id) references exercises(id)
 )""")
