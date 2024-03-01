@@ -2,7 +2,6 @@ import sqlite3
 import PySimpleGUI as sg
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.ticker import MaxNLocator
 import math
 
 # conncet = sqlite3.connect('tracker.db')
@@ -27,7 +26,7 @@ def create_plot(isEmpty, exercise):
         new_list = range(math.floor(min(x_axis)), math.ceil(max(x_axis))+1)
         plt.xticks(new_list)
         plt.plot(x_axis, y_axis, color='black', marker='o')
-        plt.title('No exercise selected', fontsize=14)
+        plt.title('Benchpress over time', fontsize=14)
         plt.xlabel('Chronological entries', fontsize=14)
         plt.ylabel('Weight moved', fontsize=14)
         plt.grid(True)
@@ -216,7 +215,7 @@ def undo():
     #if the new exercise added is true then remove that
 #review data section
 
-sg.theme('Default1')
+sg.theme('DarkAmber')
 
 conncet = sqlite3.connect('tracker.db')
 c = conncet.cursor()
@@ -232,7 +231,7 @@ l2=sg.Text("test on page 2")
 tab1= [     [sg.Text('Exercise'), sg.Combo(names, key="inp", enable_events=True, default_value='', expand_x=True)],
             [sg.Text('Total Weight'), sg.InputText(do_not_clear=False, key='weightinp')],]
 frameContents = [[sg.Canvas(size=(600, 600), key='-CANVAS-')], [sg.Text('placeholder')]]
-tab2= [     [sg.Graph((640, 480), (0, 0), (640, 480), key='Graph1')],
+tab2= [     [sg.Frame('graphHolder',frameContents)],
             [sg.Combo(names, key='graphChoice', enable_events=True, default_value='', expand_x=True, readonly=True)]]
 
 layout = [
@@ -246,67 +245,10 @@ layout = [
 # Tg = sg.TabGroup([[tab1, tab2]])
 
 
-def pack_figure(graph, figure):
-    canvas = FigureCanvasTkAgg(figure, graph.Widget)
-    plot_widget = canvas.get_tk_widget()
-    plot_widget.pack(side='top', fill='both', expand=1)
-    return plot_widget
-
-def plot_figure(index, isEmpty, exercise):
-    if isEmpty: 
-        y_axis = [0]
-        x_axis = [0]
-        new_list = range(math.floor(min(x_axis)), math.ceil(max(x_axis))+1)
-        plt.xticks(new_list)
-        fig = plt.figure(index)         # Active an existing figure
-        ax = plt.gca()                  # Get the current axes
-        ax.cla()                        # Clear the current axes
-        ax.set_title(f"Select an exercise")
-        ax.set_xlabel("No data")
-        ax.set_ylabel("No data")
-        ax.grid()
-        plt.plot(x_axis, y_axis)                  # Plot y versus x as lines and/or markers
-        fig.canvas.draw() 
-        return 
-    conncet = sqlite3.connect('tracker.db')
-
-    # create cursork
-    c = conncet.cursor()
-    c.execute(f"SELECT id FROM exercises WHERE exercise = ?", (exercise,))    
-    data = c.fetchone()
-
-    #note: i'm most certainly supposed to be using an inner join rather than 2 separate statements but this is simpler for my brain and lazier
-    c.execute(f"SELECT weight FROM data WHERE exercise_id = ?", (data[0],))  
-    weightData = c.fetchall()
-    increments = []
-    #convert the data into lists matplot can understand
-    for i in range(1,len(weightData)+1):
-        increments.append(i)
-    realWeighData = []
-    for tuplething in weightData:
-        realWeighData.append(tuplething[0])
-    new_list = range(math.floor(min(increments)), math.ceil(max(increments))+1)
-    fig = plt.figure(index)         # Active an existing figure
-    ax = plt.gca()                  # Get the current axes
-    ax.cla()                        # Clear the current axes
-    ax.set_title(f'{exercise} progress over time', fontsize=14)
-    ax.set_xlabel('Chronological entries', fontsize=14)
-    ax.set_ylabel('Weight moved', fontsize=14)
-    # ax.set_xscale(new_list)
-    # plt.ax.xticks(new_list)
-    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-    ax.grid()
-    plt.plot(increments, realWeighData)                  # Plot y versus x as lines and/or markers
-    fig.canvas.draw()  
 
 window = sg.Window('Hello Example', layout, finalize=True)
-graph1 = window['Graph1']
-plt.ioff() 
-fig1 = plt.figure(1)
-ax1 = plt.subplot(111)
-pack_figure(graph1, fig1)           # Pack figure under graph
-plot_figure(1, False, 'Bench press')
-# draw_figure(window['-CANVAS-'].TKCanvas, create_plot(True,''))
+
+draw_figure(window['-CANVAS-'].TKCanvas, create_plot(True,''))
 
 while True:
     event, values = window.read()
@@ -327,13 +269,12 @@ while True:
     elif event == 'Test':
         callData(values)
     elif event == 'graphChoice':
-        plot_figure(1, False, values['graphChoice'])
         # draw_figure(window['-CANVAS-'].TKCanvas, create_plot(False, values['graphChoice']))
         #TODO finish this part - the dynamic graph will be the last bit basically. I just need the extend layout to work
-        # window['-CANVAS-'].TKCanvas.destroy()
-        # print(window['-CANVAS-'])
-        # newitem = [[draw_figure(window['-CANVAS-'].TKCanvas, create_plot(False, values['graphChoice']))]]
-        # window.extend_layout(window['graphChoice', newitem])
+        window['-CANVAS-'].TKCanvas.destroy()
+        print(window['-CANVAS-'])
+        newitem = [[draw_figure(window['-CANVAS-'].TKCanvas, create_plot(False, values['graphChoice']))]]
+        window.extend_layout(window['graphChoice', newitem])
         # window.extend_layout(window['graphHolder'], draw_figure(window['-CANVAS-'].TKCanvas, create_plot(False, values['graphChoice'])))
         # window['-CANVAS-'].TKCanvas.update(draw_figure(window['-CANVAS-'].TKCanvas, create_plot(False, values['graphChoice'])))
 window.close()
